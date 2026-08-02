@@ -1,0 +1,271 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  background: #f4f6fb;
+  color: #222;
+}
+
+.header {
+  text-align: center;
+  padding: 16px 12px;
+  background: #ff9f68;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #fff;
+}
+
+.recipe-form {
+  max-width: 500px;
+  margin: 12px auto;
+  padding: 12px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recipe-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.recipe-form input[type="text"],
+.recipe-form input[type="url"],
+.recipe-form textarea {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: normal;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.url-row {
+  display: flex;
+  gap: 6px;
+}
+
+.url-row input {
+  flex: 1;
+}
+
+.url-row button {
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: #607d8b;
+  color: #fff;
+  cursor: pointer;
+}
+
+.fetch-message {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: normal;
+  color: #b04a00;
+  min-height: 1.2em;
+}
+
+.status-fieldset {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.status-radio {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 4px !important;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.form-buttons button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#submitButton {
+  background: #ff9f68;
+  color: #fff;
+  flex: 1;
+}
+
+#cancelEditButton {
+  background: #eee;
+  color: #333;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.filter-bar {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid #ff9f68;
+  border-radius: 8px;
+  background: #fff;
+  color: #ff9f68;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: #ff9f68;
+  color: #fff;
+}
+
+#searchBox {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.list {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 0 12px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.card.hidden-by-filter {
+  display: none;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eee;
+  color: #666;
+  white-space: nowrap;
+}
+
+.status-badge.made {
+  background: #dff5e1;
+  color: #2a9d3c;
+}
+
+.status-badge.interested {
+  background: #fff2d9;
+  color: #b07d00;
+}
+
+.card-name {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.card-link {
+  display: block;
+  font-size: 0.85rem;
+  color: #607d8b;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.card-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
+
+.card-detail p {
+  margin: 0 0 4px;
+  font-weight: bold;
+}
+
+.card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.card-buttons button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: #eee;
+  color: #333;
+}
+
+.toggle-status-button {
+  background: #dff5e1 !important;
+  color: #2a9d3c !important;
+}
+
+.send-button {
+  background: #607d8b !important;
+  color: #fff !important;
+}
+
+.delete-button {
+  background: #fde1e1 !important;
+  color: #c0392b !important;
+}
+
+.copy-message {
+  margin: 6px 0 0;
+  color: #2a9d3c;
+  font-size: 0.8rem;
+  min-height: 1.1em;
+}
