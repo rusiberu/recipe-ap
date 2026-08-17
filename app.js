@@ -28,7 +28,15 @@ const togglePlannerButton = document.getElementById("togglePlannerButton");
 const plannerPanel = document.getElementById("plannerPanel");
 const plannerDaysEl = document.getElementById("plannerDays");
 const buildShoppingListButton = document.getElementById("buildShoppingListButton");
-const weekShoppingListEl = document.getElementById("weekShoppingList");
+const recipesTabButton = document.getElementById("recipesTabButton");
+const shoppingTabButton = document.getElementById("shoppingTabButton");
+const recipesView = document.getElementById("recipesView");
+const shoppingView = document.getElementById("shoppingView");
+const shoppingItemInput = document.getElementById("shoppingItemInput");
+const addShoppingItemButton = document.getElementById("addShoppingItemButton");
+const shoppingListEl = document.getElementById("shoppingListEl");
+const clearCheckedButton = document.getElementById("clearCheckedButton");
+const clearAllButton = document.getElementById("clearAllButton");
 const toggleTimerButton = document.getElementById("toggleTimerButton");
 const timerPanel = document.getElementById("timerPanel");
 const timerDisplay = document.getElementById("timerDisplay");
@@ -41,9 +49,11 @@ const timerResetButton = document.getElementById("timerResetButton");
 
 const WEEK_PLAN_KEY = "recipe_app_week_plan_v1";
 const DAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"];
+const SHOPPING_LIST_KEY = "recipe_app_shopping_list_v1";
 
 let recipes = loadRecipes();
 let weekPlan = loadWeekPlan();
+let shoppingList = loadShoppingList();
 let currentStatusFilter = "all";
 let pendingPhotoDataUrl = null;
 let pendingRating = 0;
@@ -69,6 +79,65 @@ function loadWeekPlan() {
 
 function saveWeekPlan() {
   localStorage.setItem(WEEK_PLAN_KEY, JSON.stringify(weekPlan));
+}
+
+function loadShoppingList() {
+  const raw = localStorage.getItem(SHOPPING_LIST_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveShoppingList() {
+  localStorage.setItem(SHOPPING_LIST_KEY, JSON.stringify(shoppingList));
+}
+
+function addShoppingItems(lines, source) {
+  lines.forEach((text) => {
+    shoppingList.push({ id: generateId(), text, checked: false, source: source || null });
+  });
+  saveShoppingList();
+  renderShoppingList();
+}
+
+function renderShoppingList() {
+  shoppingListEl.innerHTML = "";
+  shoppingList.forEach((item) => {
+    const li = document.createElement("li");
+    if (item.checked) li.classList.add("checked");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = item.checked;
+    checkbox.addEventListener("change", () => {
+      item.checked = checkbox.checked;
+      li.classList.toggle("checked", checkbox.checked);
+      saveShoppingList();
+    });
+
+    const span = document.createElement("span");
+    span.className = "shopping-item-text";
+    span.textContent = item.text;
+    if (item.source) {
+      const sourceSpan = document.createElement("span");
+      sourceSpan.className = "shopping-item-source";
+      sourceSpan.textContent = `(${item.source})`;
+      span.appendChild(sourceSpan);
+    }
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "shopping-item-delete";
+    deleteButton.textContent = "×";
+    deleteButton.addEventListener("click", () => {
+      shoppingList = shoppingList.filter((i) => i.id !== item.id);
+      saveShoppingList();
+      renderShoppingList();
+    });
+
+    li.appendChild(checkbox);
+    li.appendChild(span);
+    li.appendChild(deleteButton);
+    shoppingListEl.appendChild(li);
+  });
 }
 
 function setRatingDisplay(value) {
@@ -275,8 +344,21 @@ function buildCard(recipe) {
     });
   }
 
-  const sendButton = card.querySelector(".send-button");
+  const sendToShoppingButton = card.querySelector(".send-to-shopping-button");
   const copyMessageEl = card.querySelector(".copy-message");
+  sendToShoppingButton.addEventListener("click", () => {
+    const lines = splitIngredientLines(recipe.ingredients).map((line) =>
+      scaleIngredientLine(line, currentRatio)
+    );
+    if (lines.length === 0) {
+      copyMessageEl.textContent = "材料が登録されていません。";
+      return;
+    }
+    addShoppingItems(lines, recipe.name);
+    copyMessageEl.textContent = `${lines.length}件を買い物リストに追加しました。`;
+  });
+
+  const sendButton = card.querySelector(".send-button");
   sendButton.addEventListener("click", async () => {
     const text = buildShareText(recipe);
     try {
@@ -428,6 +510,55 @@ tabButtons.forEach((btn) => {
   });
 });
 
+// --- レシピ一覧/買い物リストのタブ切り替え ---
+
+function showRecipesView() {
+  recipesView.classList.remove("hidden");
+  shoppingView.classList.add("hidden");
+  recipesTabButton.classList.add("active");
+  shoppingTabButton.classList.remove("active");
+}
+
+function showShoppingView() {
+  shoppingView.classList.remove("hidden");
+  recipesView.classList.add("hidden");
+  shoppingTabButton.classList.add("active");
+  recipesTabButton.classList.remove("active");
+}
+
+recipesTabButton.addEventListener("click", showRecipesView);
+shoppingTabButton.addEventListener("click", showShoppingView);
+
+// --- 買い物リスト(手入力・チェック・削除) ---
+
+addShoppingItemButton.addEventListener("click", () => {
+  const text = shoppingItemInput.value.trim();
+  if (!text) return;
+  addShoppingItems([text], null);
+  shoppingItemInput.value = "";
+});
+
+shoppingItemInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addShoppingItemButton.click();
+  }
+});
+
+clearCheckedButton.addEventListener("click", () => {
+  shoppingList = shoppingList.filter((item) => !item.checked);
+  saveShoppingList();
+  renderShoppingList();
+});
+
+clearAllButton.addEventListener("click", () => {
+  if (shoppingList.length === 0) return;
+  if (!confirm("買い物リストをすべて削除しますか?")) return;
+  shoppingList = [];
+  saveShoppingList();
+  renderShoppingList();
+});
+
 // --- 今日のごはんをおまかせ ---
 
 randomPickButton.addEventListener("click", () => {
@@ -509,8 +640,7 @@ togglePlannerButton.addEventListener("click", () => {
 });
 
 buildShoppingListButton.addEventListener("click", () => {
-  weekShoppingListEl.innerHTML = "";
-  let hasAny = false;
+  let addedCount = 0;
 
   DAY_NAMES.forEach((day) => {
     const recipeId = weekPlan[day];
@@ -520,34 +650,16 @@ buildShoppingListButton.addEventListener("click", () => {
     const lines = splitIngredientLines(recipe.ingredients);
     if (lines.length === 0) return;
 
-    hasAny = true;
-    const heading = document.createElement("h4");
-    heading.textContent = `${day}: ${recipe.name}`;
-    weekShoppingListEl.appendChild(heading);
-
-    const ul = document.createElement("ul");
-    ul.className = "ingredients-checklist";
-    lines.forEach((line) => {
-      const li = document.createElement("li");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.addEventListener("change", () => {
-        li.classList.toggle("checked", checkbox.checked);
-      });
-      const span = document.createElement("span");
-      span.textContent = line;
-      li.appendChild(checkbox);
-      li.appendChild(span);
-      ul.appendChild(li);
-    });
-    weekShoppingListEl.appendChild(ul);
+    addShoppingItems(lines, `${day}: ${recipe.name}`);
+    addedCount += lines.length;
   });
 
-  if (!hasAny) {
-    weekShoppingListEl.innerHTML = "<p>献立が選択されていません。曜日ごとにレシピを選んでください。</p>";
+  if (addedCount === 0) {
+    alert("献立が選択されていません。曜日ごとにレシピを選んでください。");
+    return;
   }
 
-  weekShoppingListEl.classList.remove("hidden");
+  showShoppingView();
 });
 
 // --- リンクからの自動取得(補助機能。失敗しても手入力を妨げない) ---
@@ -832,3 +944,4 @@ if ("serviceWorker" in navigator) {
 }
 
 renderList();
+renderShoppingList();

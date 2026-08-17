@@ -18,6 +18,13 @@
     <h1>マイレシピ帳</h1>
   </header>
 
+  <div class="main-tabs">
+    <button type="button" class="main-tab-button active" id="recipesTabButton">レシピ一覧</button>
+    <button type="button" class="main-tab-button" id="shoppingTabButton">買い物リスト</button>
+  </div>
+
+  <div id="recipesView">
+
   <form id="recipeForm" class="recipe-form">
     <input type="hidden" id="editingId">
 
@@ -118,7 +125,6 @@
     <div id="plannerPanel" class="planner-panel hidden">
       <div id="plannerDays" class="planner-days"></div>
       <button type="button" id="buildShoppingListButton" class="build-shopping-list-button">買い物リストを作る</button>
-      <div id="weekShoppingList" class="week-shopping-list hidden"></div>
     </div>
   </section>
 
@@ -148,6 +154,20 @@
 
   <main id="list" class="list"></main>
 
+  </div>
+
+  <div id="shoppingView" class="hidden">
+    <div class="shopping-add-row">
+      <input type="text" id="shoppingItemInput" placeholder="例: 牛乳">
+      <button type="button" id="addShoppingItemButton">追加</button>
+    </div>
+    <ul id="shoppingListEl" class="ingredients-checklist shopping-list"></ul>
+    <div class="shopping-bulk-buttons">
+      <button type="button" id="clearCheckedButton">チェック済みを削除</button>
+      <button type="button" id="clearAllButton">すべて削除</button>
+    </div>
+  </div>
+
   <template id="cardTemplate">
     <div class="card">
       <div class="card-header">
@@ -175,6 +195,7 @@
       <div class="card-buttons">
         <button type="button" class="toggle-detail-button">詳細</button>
         <button type="button" class="toggle-status-button hidden">作った!</button>
+        <button type="button" class="send-to-shopping-button">買い物リストに送る</button>
         <button type="button" class="send-button">送る</button>
         <button type="button" class="edit-button">編集</button>
         <button type="button" class="delete-button">削除</button>

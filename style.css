@@ -21,6 +21,113 @@ body {
   color: #fff;
 }
 
+.main-tabs {
+  display: flex;
+  gap: 6px;
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 0 12px;
+}
+
+.main-tab-button {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  color: #555;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.main-tab-button.active {
+  background: #ff9f68;
+  color: #fff;
+}
+
+#shoppingView {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 0 12px 24px;
+}
+
+.shopping-add-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.shopping-add-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+#addShoppingItemButton {
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: #ff9f68;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.shopping-list {
+  background: #fff;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  min-height: 1.5em;
+}
+
+.shopping-list li {
+  justify-content: space-between;
+}
+
+.shopping-item-text {
+  flex: 1;
+}
+
+.shopping-item-source {
+  font-size: 0.75rem;
+  color: #999;
+  margin-left: 4px;
+}
+
+.shopping-item-delete {
+  border: none;
+  background: none;
+  color: #c0392b;
+  font-size: 1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.shopping-bulk-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.shopping-bulk-buttons button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  color: #555;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.send-to-shopping-button {
+  background: #fff2d9 !important;
+  color: #b07d00 !important;
+}
+
 .recipe-form {
   max-width: 500px;
   margin: 12px auto;
@@ -203,19 +310,6 @@ body {
   color: #fff;
   font-weight: bold;
   cursor: pointer;
-}
-
-.week-shopping-list {
-  margin-top: 10px;
-}
-
-.week-shopping-list h4 {
-  margin: 12px 0 4px;
-  font-size: 0.9rem;
-}
-
-.week-shopping-list h4:first-child {
-  margin-top: 0;
 }
 
 .card.highlight {
