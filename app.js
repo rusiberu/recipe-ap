@@ -46,6 +46,10 @@ const timerCustomMinutes = document.getElementById("timerCustomMinutes");
 const timerStartCustomButton = document.getElementById("timerStartCustomButton");
 const timerPauseResumeButton = document.getElementById("timerPauseResumeButton");
 const timerResetButton = document.getElementById("timerResetButton");
+const installBanner = document.getElementById("installBanner");
+const installBannerText = document.getElementById("installBannerText");
+const installActionButton = document.getElementById("installActionButton");
+const dismissInstallBannerButton = document.getElementById("dismissInstallBannerButton");
 
 const WEEK_PLAN_KEY = "recipe_app_week_plan_v1";
 const DAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"];
@@ -100,7 +104,10 @@ function addShoppingItems(lines, source) {
 
 function renderShoppingList() {
   shoppingListEl.innerHTML = "";
-  shoppingList.forEach((item) => {
+  // 未チェックを上、チェック済みを下にして、スーパーで見やすくする
+  const sortedList = [...shoppingList].sort((a, b) => Number(a.checked) - Number(b.checked));
+
+  sortedList.forEach((item) => {
     const li = document.createElement("li");
     if (item.checked) li.classList.add("checked");
 
@@ -109,8 +116,8 @@ function renderShoppingList() {
     checkbox.checked = item.checked;
     checkbox.addEventListener("change", () => {
       item.checked = checkbox.checked;
-      li.classList.toggle("checked", checkbox.checked);
       saveShoppingList();
+      renderShoppingList();
     });
 
     const span = document.createElement("span");
@@ -201,6 +208,22 @@ function buildShareText(recipe) {
   return text.trim();
 }
 
+// 材料タグの自動生成に使うキーワード辞書(ベストエフォート。網羅は目指さない)
+const INGREDIENT_TAGS = [
+  "鶏肉", "豚肉", "牛肉", "ひき肉", "ベーコン", "ソーセージ", "ハム",
+  "魚", "鮭", "さば", "まぐろ", "えび", "いか", "たこ", "ツナ",
+  "卵", "豆腐", "納豆", "牛乳", "チーズ", "バター", "ヨーグルト",
+  "玉ねぎ", "にんじん", "じゃがいも", "キャベツ", "白菜", "ほうれん草",
+  "トマト", "きゅうり", "なす", "ピーマン", "もやし", "ねぎ", "大根",
+  "きのこ", "しいたけ", "えのき", "ブロッコリー", "アスパラ",
+  "米", "ごはん", "パスタ", "うどん", "そば", "パン",
+];
+
+function extractIngredientTags(ingredientsText) {
+  if (!ingredientsText) return [];
+  return INGREDIENT_TAGS.filter((tag) => ingredientsText.includes(tag));
+}
+
 function splitIngredientLines(ingredients) {
   return (ingredients || "")
     .split("\n")
@@ -272,6 +295,19 @@ function buildCard(recipe) {
   if (recipe.rating) {
     ratingEl.textContent = "★".repeat(recipe.rating) + "☆".repeat(5 - recipe.rating);
   }
+
+  const tagsEl = card.querySelector(".card-tags");
+  extractIngredientTags(recipe.ingredients).forEach((tag) => {
+    const tagButton = document.createElement("button");
+    tagButton.type = "button";
+    tagButton.className = "tag-button";
+    tagButton.textContent = tag;
+    tagButton.addEventListener("click", () => {
+      searchBox.value = tag;
+      applyFilters();
+    });
+    tagsEl.appendChild(tagButton);
+  });
 
   const thumbEl = card.querySelector(".card-thumb");
   const photoFullEl = card.querySelector(".card-photo-full");
@@ -935,6 +971,51 @@ timerResetButton.addEventListener("click", () => {
 
 updateTimerDisplay();
 timerPauseResumeButton.disabled = true;
+
+// --- ホーム画面追加バナー(すでにホーム画面から開いている場合は出さない) ---
+
+let deferredInstallPrompt = null;
+
+function isRunningStandalone() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function setupInstallBanner() {
+  if (isRunningStandalone()) return;
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (isIOS) {
+    installBannerText.textContent =
+      "共有ボタン(□に↑のアイコン)をタップして「ホーム画面に追加」を選ぶと、アプリのように使えます。";
+  } else {
+    installBannerText.textContent = "ホーム画面に追加すると、アプリのようにワンタップで開けます。";
+    installActionButton.classList.remove("hidden");
+  }
+  installBanner.classList.remove("hidden");
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  installActionButton.classList.remove("hidden");
+});
+
+installActionButton.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) {
+    alert("ブラウザのメニューから「ホーム画面に追加」または「アプリをインストール」を選んでください。");
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installBanner.classList.add("hidden");
+});
+
+dismissInstallBannerButton.addEventListener("click", () => {
+  installBanner.classList.add("hidden");
+});
+
+setupInstallBanner();
 
 // --- PWA化: ホーム画面追加・オフライン閲覧に対応 ---
 if ("serviceWorker" in navigator) {

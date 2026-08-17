@@ -21,6 +21,46 @@ body {
   color: #fff;
 }
 
+.install-banner {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 10px 12px;
+  background: #fff2d9;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.install-banner p {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #7a5a00;
+}
+
+.install-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.install-banner-actions button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+#installActionButton {
+  background: #ff9f68;
+  color: #fff;
+  font-weight: bold;
+}
+
+#dismissInstallBannerButton {
+  background: #fff;
+  color: #7a5a00;
+  border: 1px solid #e0c98a !important;
+}
+
 .main-tabs {
   display: flex;
   gap: 6px;
@@ -85,10 +125,23 @@ body {
 
 .shopping-list li {
   justify-content: space-between;
+  min-height: 44px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.shopping-list li:last-child {
+  border-bottom: none;
+}
+
+.shopping-list input[type="checkbox"] {
+  transform: scale(1.5);
+  margin-right: 4px;
 }
 
 .shopping-item-text {
   flex: 1;
+  font-size: 1.05rem;
 }
 
 .shopping-item-source {
@@ -101,7 +154,9 @@ body {
   border: none;
   background: none;
   color: #c0392b;
-  font-size: 1rem;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 8px;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -621,6 +676,26 @@ body {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.card-tags:empty {
+  display: none;
+}
+
+.tag-button {
+  padding: 2px 8px;
+  border: 1px solid #b0d4c8;
+  border-radius: 999px;
+  background: #eaf6f1;
+  color: #2a8067;
+  font-size: 0.7rem;
+  cursor: pointer;
 }
 
 .status-badge {
