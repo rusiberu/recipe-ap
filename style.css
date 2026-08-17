@@ -43,6 +43,7 @@ body {
 
 .recipe-form input[type="text"],
 .recipe-form input[type="url"],
+.recipe-form input[type="number"],
 .recipe-form textarea {
   font-family: inherit;
   font-size: 1rem;
@@ -51,6 +52,297 @@ body {
   border: 1px solid #ccc;
   border-radius: 8px;
   resize: vertical;
+}
+
+.recipe-form input[type="file"] {
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.photo-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.photo-preview {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+#removePhotoButton {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #fde1e1;
+  color: #c0392b;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.rating-input {
+  display: flex;
+  gap: 2px;
+}
+
+.star-button {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 2px;
+  cursor: pointer;
+  color: #ddd;
+}
+
+.star-button.filled {
+  color: #ffb400;
+}
+
+.card-rating {
+  font-size: 0.8rem;
+  color: #ffb400;
+  letter-spacing: 1px;
+}
+
+.card-rating:empty {
+  display: none;
+}
+
+.card-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #eee;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.card-note:empty {
+  display: none;
+  border-top: none;
+}
+
+.quick-actions {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 0 12px;
+}
+
+.random-pick-button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #607d8b;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.week-planner {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 0 12px;
+}
+
+.toggle-planner-button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ff9f68;
+  border-radius: 8px;
+  background: #fff;
+  color: #ff9f68;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.planner-panel {
+  margin-top: 8px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+.planner-days {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.planner-day-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planner-day-row .day-label {
+  width: 2.2em;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.planner-day-row select {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.build-shopping-list-button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #ff9f68;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.week-shopping-list {
+  margin-top: 10px;
+}
+
+.week-shopping-list h4 {
+  margin: 12px 0 4px;
+  font-size: 0.9rem;
+}
+
+.week-shopping-list h4:first-child {
+  margin-top: 0;
+}
+
+.card.highlight {
+  animation: highlightFlash 1.6s ease;
+}
+
+@keyframes highlightFlash {
+  0% { box-shadow: 0 0 0 4px #ff9f68; }
+  100% { box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+}
+
+.cook-timer {
+  max-width: 500px;
+  margin: 0 auto 12px;
+  padding: 0 12px;
+}
+
+.toggle-timer-button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #607d8b;
+  border-radius: 8px;
+  background: #fff;
+  color: #607d8b;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.timer-panel {
+  margin-top: 8px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  text-align: center;
+}
+
+.timer-display {
+  font-size: 2.6rem;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: #333;
+}
+
+.timer-status {
+  min-height: 1.2em;
+  margin: 4px 0 8px;
+  font-weight: bold;
+  color: #c0392b;
+}
+
+.timer-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.preset-button {
+  padding: 6px 12px;
+  border: 1px solid #607d8b;
+  border-radius: 8px;
+  background: #fff;
+  color: #607d8b;
+  cursor: pointer;
+}
+
+.timer-custom {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.timer-custom input {
+  width: 70px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.timer-custom button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: #607d8b;
+  color: #fff;
+  cursor: pointer;
+}
+
+.timer-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.timer-controls button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  color: #333;
+  cursor: pointer;
+}
+
+.timer-controls button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.timer-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.timer-panel.timer-finished {
+  animation: timerFlash 1s ease infinite alternate;
+}
+
+@keyframes timerFlash {
+  from { background: #fff; }
+  to { background: #ffe1d6; }
 }
 
 .url-row {
@@ -77,6 +369,43 @@ body {
   font-weight: normal;
   color: #b04a00;
   min-height: 1.2em;
+}
+
+.paste-fallback {
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.paste-fallback summary {
+  cursor: pointer;
+  font-weight: bold;
+  color: #607d8b;
+}
+
+.paste-help {
+  margin: 6px 0;
+}
+
+.paste-fallback textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+#parsePasteButton {
+  margin-top: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #607d8b;
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
 }
 
 .status-fieldset {
@@ -182,7 +511,22 @@ body {
 .card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.card-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.card-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .status-badge {
@@ -229,6 +573,70 @@ body {
 .card-detail p {
   margin: 0 0 4px;
   font-weight: bold;
+}
+
+.card-photo-full {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.servings-control {
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.servings-input {
+  width: 56px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.section-label {
+  margin: 0 0 4px;
+  font-weight: bold;
+}
+
+.ingredients-checklist {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ingredients-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.ingredients-checklist input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.ingredients-checklist li.checked span {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.reset-check-button {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #eee;
+  color: #555;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-bottom: 8px;
 }
 
 .card-buttons {

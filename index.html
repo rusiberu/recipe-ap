@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>マイレシピ帳</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff9f68">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body>
 
@@ -24,6 +30,13 @@
       <p id="fetchMessage" class="fetch-message"></p>
     </label>
 
+    <details class="paste-fallback">
+      <summary>うまく読み取れない場合</summary>
+      <p class="paste-help">レシピのページを開き、右クリック→「ページのソースを表示」(または Ctrl+U)で出てきた内容をすべてコピーして、下に貼り付けてください。</p>
+      <textarea id="pasteHtmlInput" rows="3" placeholder="ここにページのソースを貼り付け"></textarea>
+      <button type="button" id="parsePasteButton">貼り付けた内容から取り込む</button>
+    </details>
+
     <label>
       料理名(必須)
       <input type="text" id="nameInput" required placeholder="例: 肉じゃが">
@@ -35,8 +48,38 @@
     </label>
 
     <label>
+      基準人数(任意)
+      <input type="number" id="servingsInput" min="1" step="1" placeholder="例: 2">
+    </label>
+
+    <label>
       作り方(任意)
       <textarea id="stepsInput" rows="4" placeholder="例: 1. 野菜を切る&#10;2. 炒める"></textarea>
+    </label>
+
+    <label>
+      写真(任意)
+      <input type="file" id="photoInput" accept="image/*">
+    </label>
+    <div id="photoPreviewRow" class="photo-preview-row hidden">
+      <img id="photoPreview" class="photo-preview" alt="プレビュー">
+      <button type="button" id="removePhotoButton">写真を削除</button>
+    </div>
+
+    <label>
+      お気に入り度(任意)
+      <div class="rating-input" id="ratingInput">
+        <button type="button" class="star-button" data-value="1">★</button>
+        <button type="button" class="star-button" data-value="2">★</button>
+        <button type="button" class="star-button" data-value="3">★</button>
+        <button type="button" class="star-button" data-value="4">★</button>
+        <button type="button" class="star-button" data-value="5">★</button>
+      </div>
+    </label>
+
+    <label>
+      メモ(任意)
+      <textarea id="noteInput" rows="2" placeholder="例: 次回は塩を控えめに"></textarea>
     </label>
 
     <fieldset class="status-fieldset">
@@ -57,6 +100,10 @@
     </div>
   </form>
 
+  <div class="quick-actions">
+    <button type="button" id="randomPickButton" class="random-pick-button">今日のごはんをおまかせ</button>
+  </div>
+
   <div class="filter-bar">
     <div class="status-tabs">
       <button type="button" class="tab-button active" data-status="all">すべて</button>
@@ -66,18 +113,64 @@
     <input type="search" id="searchBox" placeholder="料理名・材料で検索">
   </div>
 
+  <section class="week-planner">
+    <button type="button" id="togglePlannerButton" class="toggle-planner-button">週間献立プランナー</button>
+    <div id="plannerPanel" class="planner-panel hidden">
+      <div id="plannerDays" class="planner-days"></div>
+      <button type="button" id="buildShoppingListButton" class="build-shopping-list-button">買い物リストを作る</button>
+      <div id="weekShoppingList" class="week-shopping-list hidden"></div>
+    </div>
+  </section>
+
+  <section class="cook-timer">
+    <button type="button" id="toggleTimerButton" class="toggle-timer-button">調理タイマー</button>
+    <div id="timerPanel" class="timer-panel hidden">
+      <div class="timer-display" id="timerDisplay">00:00</div>
+      <p id="timerStatus" class="timer-status"></p>
+      <div class="timer-presets">
+        <button type="button" class="preset-button" data-minutes="1">1分</button>
+        <button type="button" class="preset-button" data-minutes="3">3分</button>
+        <button type="button" class="preset-button" data-minutes="5">5分</button>
+        <button type="button" class="preset-button" data-minutes="10">10分</button>
+        <button type="button" class="preset-button" data-minutes="15">15分</button>
+      </div>
+      <div class="timer-custom">
+        <input type="number" id="timerCustomMinutes" min="1" step="1" placeholder="分">
+        <button type="button" id="timerStartCustomButton">開始</button>
+      </div>
+      <div class="timer-controls">
+        <button type="button" id="timerPauseResumeButton">一時停止</button>
+        <button type="button" id="timerResetButton">リセット</button>
+      </div>
+      <p class="timer-note">画面を閉じたりタブを切り替えたりすると、時間がずれることがあります。</p>
+    </div>
+  </section>
+
   <main id="list" class="list"></main>
 
   <template id="cardTemplate">
     <div class="card">
       <div class="card-header">
-        <span class="status-badge"></span>
-        <h2 class="card-name"></h2>
+        <img class="card-thumb hidden" alt="">
+        <div class="card-header-text">
+          <span class="status-badge"></span>
+          <h2 class="card-name"></h2>
+          <span class="card-rating"></span>
+        </div>
       </div>
       <a class="card-link" target="_blank" rel="noopener"></a>
       <div class="card-detail hidden">
-        <div class="card-ingredients"></div>
+        <img class="card-photo-full hidden" alt="">
+        <div class="servings-control hidden">
+          <label>人数: <input type="number" class="servings-input" min="1" step="1"></label>
+        </div>
+        <div class="ingredients-section">
+          <p class="section-label ingredients-label hidden">材料</p>
+          <ul class="ingredients-checklist"></ul>
+          <button type="button" class="reset-check-button hidden">チェックをリセット</button>
+        </div>
         <div class="card-steps"></div>
+        <div class="card-note"></div>
       </div>
       <div class="card-buttons">
         <button type="button" class="toggle-detail-button">詳細</button>

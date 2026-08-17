@@ -5,18 +5,48 @@ const editingIdInput = document.getElementById("editingId");
 const urlInput = document.getElementById("urlInput");
 const fetchButton = document.getElementById("fetchButton");
 const fetchMessage = document.getElementById("fetchMessage");
+const pasteHtmlInput = document.getElementById("pasteHtmlInput");
+const parsePasteButton = document.getElementById("parsePasteButton");
 const nameInput = document.getElementById("nameInput");
 const ingredientsInput = document.getElementById("ingredientsInput");
+const servingsInput = document.getElementById("servingsInput");
 const stepsInput = document.getElementById("stepsInput");
+const photoInput = document.getElementById("photoInput");
+const photoPreviewRow = document.getElementById("photoPreviewRow");
+const photoPreview = document.getElementById("photoPreview");
+const removePhotoButton = document.getElementById("removePhotoButton");
+const starButtons = document.querySelectorAll(".star-button");
+const noteInput = document.getElementById("noteInput");
 const submitButton = document.getElementById("submitButton");
 const cancelEditButton = document.getElementById("cancelEditButton");
 const searchBox = document.getElementById("searchBox");
 const tabButtons = document.querySelectorAll(".tab-button");
 const listEl = document.getElementById("list");
 const cardTemplate = document.getElementById("cardTemplate");
+const randomPickButton = document.getElementById("randomPickButton");
+const togglePlannerButton = document.getElementById("togglePlannerButton");
+const plannerPanel = document.getElementById("plannerPanel");
+const plannerDaysEl = document.getElementById("plannerDays");
+const buildShoppingListButton = document.getElementById("buildShoppingListButton");
+const weekShoppingListEl = document.getElementById("weekShoppingList");
+const toggleTimerButton = document.getElementById("toggleTimerButton");
+const timerPanel = document.getElementById("timerPanel");
+const timerDisplay = document.getElementById("timerDisplay");
+const timerStatus = document.getElementById("timerStatus");
+const presetButtons = document.querySelectorAll(".preset-button");
+const timerCustomMinutes = document.getElementById("timerCustomMinutes");
+const timerStartCustomButton = document.getElementById("timerStartCustomButton");
+const timerPauseResumeButton = document.getElementById("timerPauseResumeButton");
+const timerResetButton = document.getElementById("timerResetButton");
+
+const WEEK_PLAN_KEY = "recipe_app_week_plan_v1";
+const DAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"];
 
 let recipes = loadRecipes();
+let weekPlan = loadWeekPlan();
 let currentStatusFilter = "all";
+let pendingPhotoDataUrl = null;
+let pendingRating = 0;
 
 function generateId() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -32,24 +62,59 @@ function saveRecipes() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
 }
 
+function loadWeekPlan() {
+  const raw = localStorage.getItem(WEEK_PLAN_KEY);
+  return raw ? JSON.parse(raw) : {};
+}
+
+function saveWeekPlan() {
+  localStorage.setItem(WEEK_PLAN_KEY, JSON.stringify(weekPlan));
+}
+
+function setRatingDisplay(value) {
+  starButtons.forEach((btn) => {
+    btn.classList.toggle("filled", Number(btn.dataset.value) <= value);
+  });
+}
+
 function resetForm() {
   form.reset();
   editingIdInput.value = "";
   submitButton.textContent = "追加";
   cancelEditButton.classList.add("hidden");
   fetchMessage.textContent = "";
+  pendingPhotoDataUrl = null;
+  photoPreview.src = "";
+  photoPreviewRow.classList.add("hidden");
+  pendingRating = 0;
+  setRatingDisplay(0);
 }
 
 function startEdit(recipe) {
   nameInput.value = recipe.name;
   urlInput.value = recipe.url || "";
   ingredientsInput.value = recipe.ingredients || "";
+  servingsInput.value = recipe.servings || "";
   stepsInput.value = recipe.steps || "";
+  noteInput.value = recipe.note || "";
   form.querySelector(`input[name="status"][value="${recipe.status}"]`).checked = true;
   editingIdInput.value = recipe.id;
   submitButton.textContent = "更新";
   cancelEditButton.classList.remove("hidden");
   fetchMessage.textContent = "";
+
+  pendingRating = recipe.rating || 0;
+  setRatingDisplay(pendingRating);
+
+  pendingPhotoDataUrl = recipe.photo || null;
+  if (recipe.photo) {
+    photoPreview.src = recipe.photo;
+    photoPreviewRow.classList.remove("hidden");
+  } else {
+    photoPreview.src = "";
+    photoPreviewRow.classList.add("hidden");
+  }
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -67,6 +132,63 @@ function buildShareText(recipe) {
   return text.trim();
 }
 
+function splitIngredientLines(ingredients) {
+  return (ingredients || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+// 分量計算(人数変更): 材料の各行にある数値・簡単な分数(例:1/2)を比率倍にする
+// あくまで自由記述テキストへのベストエフォートな置換であり、完璧な計算は保証しない
+function scaleIngredientLine(line, ratio) {
+  if (!ratio || ratio === 1) return line;
+  return line.replace(/\d+\/\d+|\d+(?:\.\d+)?/g, (match) => {
+    let value;
+    if (match.includes("/")) {
+      const [n, d] = match.split("/").map(Number);
+      value = d ? n / d : n;
+    } else {
+      value = Number(match);
+    }
+    const scaled = Math.round(value * ratio * 100) / 100;
+    return String(scaled);
+  });
+}
+
+function renderIngredientsChecklist(listEl, recipe, ratio) {
+  listEl.innerHTML = "";
+  const lines = splitIngredientLines(recipe.ingredients);
+  const checked = new Set(recipe.checkedIngredients || []);
+
+  lines.forEach((line, index) => {
+    const li = document.createElement("li");
+    if (checked.has(index)) li.classList.add("checked");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = checked.has(index);
+    checkbox.addEventListener("change", () => {
+      const set = new Set(recipe.checkedIngredients || []);
+      if (checkbox.checked) {
+        set.add(index);
+      } else {
+        set.delete(index);
+      }
+      recipe.checkedIngredients = [...set];
+      li.classList.toggle("checked", checkbox.checked);
+      saveRecipes();
+    });
+
+    const span = document.createElement("span");
+    span.textContent = scaleIngredientLine(line, ratio);
+
+    li.appendChild(checkbox);
+    li.appendChild(span);
+    listEl.appendChild(li);
+  });
+}
+
 function buildCard(recipe) {
   const node = cardTemplate.content.cloneNode(true);
   const card = node.querySelector(".card");
@@ -77,6 +199,20 @@ function buildCard(recipe) {
 
   card.querySelector(".card-name").textContent = recipe.name;
 
+  const ratingEl = card.querySelector(".card-rating");
+  if (recipe.rating) {
+    ratingEl.textContent = "★".repeat(recipe.rating) + "☆".repeat(5 - recipe.rating);
+  }
+
+  const thumbEl = card.querySelector(".card-thumb");
+  const photoFullEl = card.querySelector(".card-photo-full");
+  if (recipe.photo) {
+    thumbEl.src = recipe.photo;
+    thumbEl.classList.remove("hidden");
+    photoFullEl.src = recipe.photo;
+    photoFullEl.classList.remove("hidden");
+  }
+
   const linkEl = card.querySelector(".card-link");
   if (recipe.url) {
     linkEl.href = recipe.url;
@@ -86,10 +222,42 @@ function buildCard(recipe) {
   }
 
   const detailEl = card.querySelector(".card-detail");
-  const ingredientsEl = card.querySelector(".card-ingredients");
   const stepsEl = card.querySelector(".card-steps");
-  ingredientsEl.textContent = recipe.ingredients ? `材料:\n${recipe.ingredients}` : "";
   stepsEl.textContent = recipe.steps ? `作り方:\n${recipe.steps}` : "";
+
+  const noteEl = card.querySelector(".card-note");
+  noteEl.textContent = recipe.note ? `メモ: ${recipe.note}` : "";
+
+  const ingredientsListEl = card.querySelector(".ingredients-checklist");
+  const ingredientsLabelEl = card.querySelector(".ingredients-label");
+  const resetCheckButton = card.querySelector(".reset-check-button");
+  const ingredientLines = splitIngredientLines(recipe.ingredients);
+  let currentRatio = 1;
+
+  if (ingredientLines.length > 0) {
+    ingredientsLabelEl.classList.remove("hidden");
+    resetCheckButton.classList.remove("hidden");
+  }
+
+  const servingsControl = card.querySelector(".servings-control");
+  const servingsInputEl = card.querySelector(".servings-input");
+  if (recipe.servings) {
+    servingsControl.classList.remove("hidden");
+    servingsInputEl.value = recipe.servings;
+    servingsInputEl.addEventListener("input", () => {
+      const newServings = Number(servingsInputEl.value);
+      currentRatio = newServings > 0 ? newServings / recipe.servings : 1;
+      renderIngredientsChecklist(ingredientsListEl, recipe, currentRatio);
+    });
+  }
+
+  renderIngredientsChecklist(ingredientsListEl, recipe, currentRatio);
+
+  resetCheckButton.addEventListener("click", () => {
+    recipe.checkedIngredients = [];
+    saveRecipes();
+    renderIngredientsChecklist(ingredientsListEl, recipe, currentRatio);
+  });
 
   const toggleDetailButton = card.querySelector(".toggle-detail-button");
   toggleDetailButton.addEventListener("click", () => {
@@ -130,6 +298,7 @@ function buildCard(recipe) {
     renderList();
   });
 
+  card.dataset.id = recipe.id;
   card.dataset.name = recipe.name.toLowerCase();
   card.dataset.ingredients = (recipe.ingredients || "").toLowerCase();
   card.dataset.status = recipe.status;
@@ -143,6 +312,7 @@ function renderList() {
     listEl.appendChild(buildCard(recipe));
   }
   applyFilters();
+  renderPlannerDays();
 }
 
 function applyFilters() {
@@ -155,6 +325,58 @@ function applyFilters() {
   });
 }
 
+// --- 写真添付(任意。localStorageの容量を圧迫しないよう、保存前に縮小・圧縮する) ---
+
+function resizeImageFile(file, maxWidth = 800, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+photoInput.addEventListener("change", async () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  try {
+    pendingPhotoDataUrl = await resizeImageFile(file);
+    photoPreview.src = pendingPhotoDataUrl;
+    photoPreviewRow.classList.remove("hidden");
+  } catch (e) {
+    alert("写真の読み込みに失敗しました。別の写真でお試しください。");
+  }
+});
+
+removePhotoButton.addEventListener("click", () => {
+  pendingPhotoDataUrl = null;
+  photoInput.value = "";
+  photoPreview.src = "";
+  photoPreviewRow.classList.add("hidden");
+});
+
+// --- お気に入り度(★) ---
+
+starButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const value = Number(btn.dataset.value);
+    pendingRating = pendingRating === value ? 0 : value;
+    setRatingDisplay(pendingRating);
+  });
+});
+
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   const name = nameInput.value.trim();
@@ -164,8 +386,13 @@ form.addEventListener("submit", (e) => {
     name,
     url: urlInput.value.trim(),
     ingredients: ingredientsInput.value.trim(),
+    servings: servingsInput.value ? Number(servingsInput.value) : undefined,
     steps: stepsInput.value.trim(),
+    photo: pendingPhotoDataUrl || undefined,
+    rating: pendingRating || undefined,
+    note: noteInput.value.trim(),
     status: form.querySelector('input[name="status"]:checked').value,
+    checkedIngredients: [],
   };
 
   if (editingIdInput.value) {
@@ -175,7 +402,16 @@ form.addEventListener("submit", (e) => {
     recipes.push({ id: generateId(), createdAt: Date.now(), ...recipeData });
   }
 
-  saveRecipes();
+  try {
+    saveRecipes();
+  } catch (err) {
+    if (err && err.name === "QuotaExceededError") {
+      alert("保存容量が一杯です。写真を減らすか、他のレシピの写真を削除してから、もう一度試してください。");
+      return;
+    }
+    throw err;
+  }
+
   resetForm();
   renderList();
 });
@@ -190,6 +426,128 @@ tabButtons.forEach((btn) => {
     currentStatusFilter = btn.dataset.status;
     applyFilters();
   });
+});
+
+// --- 今日のごはんをおまかせ ---
+
+randomPickButton.addEventListener("click", () => {
+  const madeRecipes = recipes.filter((r) => r.status === "made");
+  if (madeRecipes.length === 0) {
+    alert("「作った」レシピがまだ登録されていません。");
+    return;
+  }
+
+  const picked = madeRecipes[Math.floor(Math.random() * madeRecipes.length)];
+
+  searchBox.value = "";
+  tabButtons.forEach((b) => b.classList.toggle("active", b.dataset.status === "made"));
+  currentStatusFilter = "made";
+  applyFilters();
+
+  const card = listEl.querySelector(`.card[data-id="${picked.id}"]`);
+  if (!card) return;
+
+  const detailEl = card.querySelector(".card-detail");
+  const toggleDetailButton = card.querySelector(".toggle-detail-button");
+  detailEl.classList.remove("hidden");
+  toggleDetailButton.textContent = "閉じる";
+
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  card.classList.add("highlight");
+  setTimeout(() => card.classList.remove("highlight"), 1600);
+});
+
+// --- 週間献立プランナー ---
+
+function renderPlannerDays() {
+  const validIds = new Set(recipes.map((r) => r.id));
+  let changed = false;
+  DAY_NAMES.forEach((day) => {
+    if (weekPlan[day] && !validIds.has(weekPlan[day])) {
+      weekPlan[day] = "";
+      changed = true;
+    }
+  });
+  if (changed) saveWeekPlan();
+
+  plannerDaysEl.innerHTML = "";
+  DAY_NAMES.forEach((day) => {
+    const row = document.createElement("div");
+    row.className = "planner-day-row";
+
+    const label = document.createElement("span");
+    label.className = "day-label";
+    label.textContent = day;
+
+    const select = document.createElement("select");
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "-- 未定 --";
+    select.appendChild(emptyOption);
+
+    recipes.forEach((recipe) => {
+      const option = document.createElement("option");
+      option.value = recipe.id;
+      option.textContent = recipe.name;
+      if (weekPlan[day] === recipe.id) option.selected = true;
+      select.appendChild(option);
+    });
+
+    select.addEventListener("change", () => {
+      weekPlan[day] = select.value;
+      saveWeekPlan();
+    });
+
+    row.appendChild(label);
+    row.appendChild(select);
+    plannerDaysEl.appendChild(row);
+  });
+}
+
+togglePlannerButton.addEventListener("click", () => {
+  plannerPanel.classList.toggle("hidden");
+});
+
+buildShoppingListButton.addEventListener("click", () => {
+  weekShoppingListEl.innerHTML = "";
+  let hasAny = false;
+
+  DAY_NAMES.forEach((day) => {
+    const recipeId = weekPlan[day];
+    if (!recipeId) return;
+    const recipe = recipes.find((r) => r.id === recipeId);
+    if (!recipe) return;
+    const lines = splitIngredientLines(recipe.ingredients);
+    if (lines.length === 0) return;
+
+    hasAny = true;
+    const heading = document.createElement("h4");
+    heading.textContent = `${day}: ${recipe.name}`;
+    weekShoppingListEl.appendChild(heading);
+
+    const ul = document.createElement("ul");
+    ul.className = "ingredients-checklist";
+    lines.forEach((line) => {
+      const li = document.createElement("li");
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.addEventListener("change", () => {
+        li.classList.toggle("checked", checkbox.checked);
+      });
+      const span = document.createElement("span");
+      span.textContent = line;
+      li.appendChild(checkbox);
+      li.appendChild(span);
+      ul.appendChild(li);
+    });
+    weekShoppingListEl.appendChild(ul);
+  });
+
+  if (!hasAny) {
+    weekShoppingListEl.innerHTML = "<p>献立が選択されていません。曜日ごとにレシピを選んでください。</p>";
+  }
+
+  weekShoppingListEl.classList.remove("hidden");
 });
 
 // --- リンクからの自動取得(補助機能。失敗しても手入力を妨げない) ---
@@ -211,12 +569,30 @@ async function fetchYouTubeTitle(url) {
   return data.title;
 }
 
-// レシピサイトはCORSで直接fetchできないことが多いため、公開プロキシ経由でHTMLを取得する
-async function fetchRecipeSiteData(url) {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error("proxy request failed");
-  const html = await res.text();
+// レシピサイトはCORSで直接fetchできないことが多いため、公開プロキシ経由でHTMLを取得する。
+// 1つ目がダメでも2つ目を試す(それでもダメなサイトはあり得る)
+const CORS_PROXIES = [
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+];
+
+async function fetchHtmlViaProxies(url) {
+  let lastError;
+  for (const buildProxyUrl of CORS_PROXIES) {
+    try {
+      const res = await fetch(buildProxyUrl(url));
+      if (!res.ok) throw new Error("proxy request failed");
+      return await res.text();
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError || new Error("all proxies failed");
+}
+
+// JSON-LD(schema.org Recipe)→OGPの順で探す。ネットワーク取得とは独立しているので、
+// 自動取得(fetchRecipeSiteData)・手動貼り付け(parsePasteButton)の両方から使える
+function parseRecipeHtml(html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
 
@@ -230,7 +606,21 @@ async function fetchRecipeSiteData(url) {
     const found = findRecipeObject(data);
     if (found) return found;
   }
-  return null;
+
+  return extractOgFallback(doc);
+}
+
+// JSON-LDが無いサイト向けの最終手段。og:titleがあれば料理名だけでも拾う
+function extractOgFallback(doc) {
+  const ogTitle = doc.querySelector('meta[property="og:title"]');
+  const title = ogTitle ? ogTitle.getAttribute("content") : null;
+  if (!title) return null;
+  return { name: title, ingredients: "", steps: "" };
+}
+
+async function fetchRecipeSiteData(url) {
+  const html = await fetchHtmlViaProxies(url);
+  return parseRecipeHtml(html);
 }
 
 // schema.orgのRecipe構造はサイトによって配列/@graph/入れ子など形が異なるため再帰的に探す
@@ -302,5 +692,143 @@ fetchButton.addEventListener("click", async () => {
     fetchMessage.textContent = "自動取得できませんでした。お手数ですが手入力してください。";
   }
 });
+
+parsePasteButton.addEventListener("click", () => {
+  const html = pasteHtmlInput.value.trim();
+  if (!html) {
+    fetchMessage.textContent = "貼り付け内容が空です。";
+    return;
+  }
+
+  const recipe = parseRecipeHtml(html);
+  if (!recipe) {
+    fetchMessage.textContent = "貼り付けた内容からは読み取れませんでした。";
+    return;
+  }
+
+  if (recipe.name) nameInput.value = recipe.name;
+  if (recipe.ingredients) ingredientsInput.value = recipe.ingredients;
+  if (recipe.steps) stepsInput.value = recipe.steps;
+  fetchMessage.textContent = "貼り付けた内容から取り込みました。内容を確認してください。";
+});
+
+// --- 調理タイマー(レシピとは独立したシンプルなキッチンタイマー。同時に1つだけ) ---
+
+let timerRemainingSeconds = 0;
+let timerIntervalId = null;
+let timerRunning = false;
+
+function formatTime(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function updateTimerDisplay() {
+  timerDisplay.textContent = formatTime(Math.max(0, timerRemainingSeconds));
+}
+
+function tickTimer() {
+  timerRemainingSeconds--;
+  updateTimerDisplay();
+  if (timerRemainingSeconds <= 0) {
+    stopTimerInterval();
+    onTimerFinish();
+  }
+}
+
+function startTimerInterval() {
+  clearInterval(timerIntervalId);
+  timerIntervalId = setInterval(tickTimer, 1000);
+  timerRunning = true;
+  timerPauseResumeButton.disabled = false;
+  timerPauseResumeButton.textContent = "一時停止";
+}
+
+function stopTimerInterval() {
+  clearInterval(timerIntervalId);
+  timerIntervalId = null;
+  timerRunning = false;
+}
+
+function setAndStartTimer(minutes) {
+  timerPanel.classList.remove("timer-finished");
+  timerStatus.textContent = "";
+  timerRemainingSeconds = Math.round(minutes * 60);
+  updateTimerDisplay();
+  startTimerInterval();
+}
+
+// 音声ファイルなしで、その場で短いビープ音を鳴らす
+function playBeep() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  const ctx = new AudioCtx();
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.value = 880;
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+  oscillator.start();
+  oscillator.stop(ctx.currentTime + 0.8);
+}
+
+function onTimerFinish() {
+  playBeep();
+  setTimeout(playBeep, 900);
+  if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+  timerStatus.textContent = "タイマー終了!";
+  timerPanel.classList.add("timer-finished");
+  timerPauseResumeButton.disabled = true;
+}
+
+toggleTimerButton.addEventListener("click", () => {
+  timerPanel.classList.toggle("hidden");
+});
+
+presetButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setAndStartTimer(Number(btn.dataset.minutes));
+  });
+});
+
+timerStartCustomButton.addEventListener("click", () => {
+  const minutes = Number(timerCustomMinutes.value);
+  if (!minutes || minutes <= 0) return;
+  setAndStartTimer(minutes);
+});
+
+timerPauseResumeButton.addEventListener("click", () => {
+  if (timerRemainingSeconds <= 0) return;
+  if (timerRunning) {
+    stopTimerInterval();
+    timerPauseResumeButton.textContent = "再開";
+  } else {
+    startTimerInterval();
+  }
+});
+
+timerResetButton.addEventListener("click", () => {
+  stopTimerInterval();
+  timerRemainingSeconds = 0;
+  updateTimerDisplay();
+  timerStatus.textContent = "";
+  timerPanel.classList.remove("timer-finished");
+  timerPauseResumeButton.disabled = true;
+  timerPauseResumeButton.textContent = "一時停止";
+});
+
+updateTimerDisplay();
+timerPauseResumeButton.disabled = true;
+
+// --- PWA化: ホーム画面追加・オフライン閲覧に対応 ---
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
 
 renderList();
