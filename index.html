@@ -31,6 +31,19 @@
     <button type="button" class="main-tab-button" id="shoppingTabButton">買い物リスト</button>
   </div>
 
+  <section class="backup-section">
+    <button type="button" id="toggleBackupButton" class="toggle-backup-button">データのバックアップ</button>
+    <div id="backupPanel" class="backup-panel hidden">
+      <p class="backup-help">機種変更やブラウザデータの消去に備えて、レシピ・週間献立・買い物リストをまとめてファイルに保存できます。</p>
+      <button type="button" id="exportDataButton">書き出す(ダウンロード)</button>
+      <label class="import-label">
+        読み込む(書き出したファイルを選択)
+        <input type="file" id="importDataInput" accept="application/json">
+      </label>
+      <p id="backupMessage" class="backup-message"></p>
+    </div>
+  </section>
+
   <div id="recipesView">
 
   <form id="recipeForm" class="recipe-form">
@@ -126,6 +139,12 @@
       <button type="button" class="tab-button" data-status="interested">気になるもの</button>
     </div>
     <input type="search" id="searchBox" placeholder="料理名・材料で検索">
+    <select id="sortSelect">
+      <option value="default">登録順</option>
+      <option value="name">五十音順</option>
+      <option value="newest">新しい順</option>
+      <option value="cookCount">作った回数順</option>
+    </select>
   </div>
 
   <section class="week-planner">
@@ -192,6 +211,10 @@
         <img class="card-photo-full hidden" alt="">
         <div class="servings-control hidden">
           <label>人数: <input type="number" class="servings-input" min="1" step="1"></label>
+        </div>
+        <div class="cook-count-row">
+          <span class="cook-count-text"></span>
+          <button type="button" class="cook-count-button">作った +1</button>
         </div>
         <div class="ingredients-section">
           <p class="section-label ingredients-label hidden">材料</p>

@@ -50,6 +50,12 @@ const installBanner = document.getElementById("installBanner");
 const installBannerText = document.getElementById("installBannerText");
 const installActionButton = document.getElementById("installActionButton");
 const dismissInstallBannerButton = document.getElementById("dismissInstallBannerButton");
+const toggleBackupButton = document.getElementById("toggleBackupButton");
+const backupPanel = document.getElementById("backupPanel");
+const exportDataButton = document.getElementById("exportDataButton");
+const importDataInput = document.getElementById("importDataInput");
+const backupMessage = document.getElementById("backupMessage");
+const sortSelect = document.getElementById("sortSelect");
 
 const WEEK_PLAN_KEY = "recipe_app_week_plan_v1";
 const DAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"];
@@ -58,6 +64,7 @@ const SHOPPING_LIST_KEY = "recipe_app_shopping_list_v1";
 let recipes = loadRecipes();
 let weekPlan = loadWeekPlan();
 let shoppingList = loadShoppingList();
+let currentSort = "default";
 let currentStatusFilter = "all";
 let pendingPhotoDataUrl = null;
 let pendingRating = 0;
@@ -102,48 +109,69 @@ function addShoppingItems(lines, source) {
   renderShoppingList();
 }
 
+function buildShoppingItemRow(item) {
+  const li = document.createElement("li");
+  if (item.checked) li.classList.add("checked");
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = item.checked;
+  checkbox.addEventListener("change", () => {
+    item.checked = checkbox.checked;
+    saveShoppingList();
+    renderShoppingList();
+  });
+
+  const span = document.createElement("span");
+  span.className = "shopping-item-text";
+  span.textContent = item.text;
+  if (item.source) {
+    const sourceSpan = document.createElement("span");
+    sourceSpan.className = "shopping-item-source";
+    sourceSpan.textContent = `(${item.source})`;
+    span.appendChild(sourceSpan);
+  }
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "shopping-item-delete";
+  deleteButton.textContent = "×";
+  deleteButton.addEventListener("click", () => {
+    shoppingList = shoppingList.filter((i) => i.id !== item.id);
+    saveShoppingList();
+    renderShoppingList();
+  });
+
+  li.appendChild(checkbox);
+  li.appendChild(span);
+  li.appendChild(deleteButton);
+  return li;
+}
+
 function renderShoppingList() {
   shoppingListEl.innerHTML = "";
   // 未チェックを上、チェック済みを下にして、スーパーで見やすくする
   const sortedList = [...shoppingList].sort((a, b) => Number(a.checked) - Number(b.checked));
 
+  // カテゴリごとにグループ化して見出し付きで表示する(材料タグと同じ辞書を流用)
+  const categoryOrder = [...Object.keys(INGREDIENT_CATEGORIES), "その他"];
+  const grouped = new Map(categoryOrder.map((cat) => [cat, []]));
   sortedList.forEach((item) => {
-    const li = document.createElement("li");
-    if (item.checked) li.classList.add("checked");
+    grouped.get(getItemCategory(item.text)).push(item);
+  });
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = item.checked;
-    checkbox.addEventListener("change", () => {
-      item.checked = checkbox.checked;
-      saveShoppingList();
-      renderShoppingList();
+  categoryOrder.forEach((category) => {
+    const items = grouped.get(category);
+    if (items.length === 0) return;
+
+    const heading = document.createElement("li");
+    heading.className = "shopping-category-heading";
+    heading.textContent = category;
+    shoppingListEl.appendChild(heading);
+
+    items.forEach((item) => {
+      shoppingListEl.appendChild(buildShoppingItemRow(item));
     });
-
-    const span = document.createElement("span");
-    span.className = "shopping-item-text";
-    span.textContent = item.text;
-    if (item.source) {
-      const sourceSpan = document.createElement("span");
-      sourceSpan.className = "shopping-item-source";
-      sourceSpan.textContent = `(${item.source})`;
-      span.appendChild(sourceSpan);
-    }
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "shopping-item-delete";
-    deleteButton.textContent = "×";
-    deleteButton.addEventListener("click", () => {
-      shoppingList = shoppingList.filter((i) => i.id !== item.id);
-      saveShoppingList();
-      renderShoppingList();
-    });
-
-    li.appendChild(checkbox);
-    li.appendChild(span);
-    li.appendChild(deleteButton);
-    shoppingListEl.appendChild(li);
   });
 }
 
@@ -208,20 +236,27 @@ function buildShareText(recipe) {
   return text.trim();
 }
 
-// 材料タグの自動生成に使うキーワード辞書(ベストエフォート。網羅は目指さない)
-const INGREDIENT_TAGS = [
-  "鶏肉", "豚肉", "牛肉", "ひき肉", "ベーコン", "ソーセージ", "ハム",
-  "魚", "鮭", "さば", "まぐろ", "えび", "いか", "たこ", "ツナ",
-  "卵", "豆腐", "納豆", "牛乳", "チーズ", "バター", "ヨーグルト",
-  "玉ねぎ", "にんじん", "じゃがいも", "キャベツ", "白菜", "ほうれん草",
-  "トマト", "きゅうり", "なす", "ピーマン", "もやし", "ねぎ", "大根",
-  "きのこ", "しいたけ", "えのき", "ブロッコリー", "アスパラ",
-  "米", "ごはん", "パスタ", "うどん", "そば", "パン",
-];
+// 材料タグ・買い物リストのカテゴリ分けに使うキーワード辞書(ベストエフォート。網羅は目指さない)
+const INGREDIENT_CATEGORIES = {
+  "肉・魚": ["鶏肉", "豚肉", "牛肉", "ひき肉", "ベーコン", "ソーセージ", "ハム", "魚", "鮭", "さば", "まぐろ", "えび", "いか", "たこ", "ツナ"],
+  "卵・豆腐・乳製品": ["卵", "豆腐", "納豆", "牛乳", "チーズ", "バター", "ヨーグルト"],
+  "野菜": ["玉ねぎ", "にんじん", "じゃがいも", "キャベツ", "白菜", "ほうれん草", "トマト", "きゅうり", "なす", "ピーマン", "もやし", "ねぎ", "大根", "きのこ", "しいたけ", "えのき", "ブロッコリー", "アスパラ"],
+  "主食": ["米", "ごはん", "パスタ", "うどん", "そば", "パン"],
+};
+
+const INGREDIENT_TAGS = Object.values(INGREDIENT_CATEGORIES).flat();
 
 function extractIngredientTags(ingredientsText) {
   if (!ingredientsText) return [];
   return INGREDIENT_TAGS.filter((tag) => ingredientsText.includes(tag));
+}
+
+// 買い物リストの項目テキストから、どのカテゴリ見出しの下に並べるかを判定する
+function getItemCategory(text) {
+  for (const [category, keywords] of Object.entries(INGREDIENT_CATEGORIES)) {
+    if (keywords.some((keyword) => text.includes(keyword))) return category;
+  }
+  return "その他";
 }
 
 function splitIngredientLines(ingredients) {
@@ -344,6 +379,15 @@ function buildCard(recipe) {
     resetCheckButton.classList.remove("hidden");
   }
 
+  const cookCountText = card.querySelector(".cook-count-text");
+  const cookCountButton = card.querySelector(".cook-count-button");
+  cookCountText.textContent = `作った回数: ${recipe.cookCount || 0}回`;
+  cookCountButton.addEventListener("click", () => {
+    recipe.cookCount = (recipe.cookCount || 0) + 1;
+    saveRecipes();
+    cookCountText.textContent = `作った回数: ${recipe.cookCount}回`;
+  });
+
   const servingsControl = card.querySelector(".servings-control");
   const servingsInputEl = card.querySelector(".servings-input");
   if (recipe.servings) {
@@ -424,14 +468,31 @@ function buildCard(recipe) {
   return card;
 }
 
+function sortRecipesForDisplay(list) {
+  const sorted = [...list];
+  if (currentSort === "name") {
+    sorted.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  } else if (currentSort === "newest") {
+    sorted.sort((a, b) => b.createdAt - a.createdAt);
+  } else if (currentSort === "cookCount") {
+    sorted.sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0));
+  }
+  return sorted;
+}
+
 function renderList() {
   listEl.innerHTML = "";
-  for (const recipe of recipes) {
+  for (const recipe of sortRecipesForDisplay(recipes)) {
     listEl.appendChild(buildCard(recipe));
   }
   applyFilters();
   renderPlannerDays();
 }
+
+sortSelect.addEventListener("change", () => {
+  currentSort = sortSelect.value;
+  renderList();
+});
 
 function applyFilters() {
   const keyword = searchBox.value.trim().toLowerCase();
@@ -517,7 +578,7 @@ form.addEventListener("submit", (e) => {
     const target = recipes.find((r) => r.id === editingIdInput.value);
     if (target) Object.assign(target, recipeData);
   } else {
-    recipes.push({ id: generateId(), createdAt: Date.now(), ...recipeData });
+    recipes.push({ id: generateId(), createdAt: Date.now(), cookCount: 0, ...recipeData });
   }
 
   try {
@@ -971,6 +1032,70 @@ timerResetButton.addEventListener("click", () => {
 
 updateTimerDisplay();
 timerPauseResumeButton.disabled = true;
+
+// --- データのバックアップ(書き出し/読み込み) ---
+
+toggleBackupButton.addEventListener("click", () => {
+  backupPanel.classList.toggle("hidden");
+});
+
+exportDataButton.addEventListener("click", () => {
+  const backupData = {
+    recipes,
+    weekPlan,
+    shoppingList,
+    exportedAt: new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `recipe-app-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  backupMessage.textContent = "書き出しました。";
+});
+
+importDataInput.addEventListener("change", () => {
+  const file = importDataInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      backupMessage.textContent = "ファイルの読み込みに失敗しました。正しいバックアップファイルか確認してください。";
+      importDataInput.value = "";
+      return;
+    }
+
+    if (!Array.isArray(data.recipes)) {
+      backupMessage.textContent = "バックアップファイルの形式が正しくありません。";
+      importDataInput.value = "";
+      return;
+    }
+
+    if (!confirm("今のデータを上書きして読み込みますか?この操作は元に戻せません。")) {
+      importDataInput.value = "";
+      return;
+    }
+
+    recipes = data.recipes || [];
+    weekPlan = data.weekPlan || {};
+    shoppingList = data.shoppingList || [];
+    saveRecipes();
+    saveWeekPlan();
+    saveShoppingList();
+    renderList();
+    renderShoppingList();
+    backupMessage.textContent = "読み込みました。";
+    importDataInput.value = "";
+  };
+  reader.readAsText(file);
+});
 
 // --- ホーム画面追加バナー(すでにホーム画面から開いている場合は出さない) ---
 
