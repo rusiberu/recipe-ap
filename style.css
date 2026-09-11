@@ -21,6 +21,51 @@ body {
   color: #fff;
 }
 
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.update-notice-sheet {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.update-notice-sheet h3 {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+}
+
+.update-notice-item {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.close-update-notice-button {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #ff9f68;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
 .install-banner {
   max-width: 500px;
   margin: 0 auto 12px;

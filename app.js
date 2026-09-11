@@ -56,10 +56,17 @@ const exportDataButton = document.getElementById("exportDataButton");
 const importDataInput = document.getElementById("importDataInput");
 const backupMessage = document.getElementById("backupMessage");
 const sortSelect = document.getElementById("sortSelect");
+const updateNoticeOverlay = document.getElementById("updateNoticeOverlay");
+const updateNoticeTitle = document.getElementById("updateNoticeTitle");
+const updateNoticeBody = document.getElementById("updateNoticeBody");
+const closeUpdateNoticeButton = document.getElementById("closeUpdateNoticeButton");
 
 const WEEK_PLAN_KEY = "recipe_app_week_plan_v1";
 const DAY_NAMES = ["月", "火", "水", "木", "金", "土", "日"];
 const SHOPPING_LIST_KEY = "recipe_app_shopping_list_v1";
+
+// アップデート通知を出す前に、このブラウザで一度もレシピを保存したことがないか(初めて使う人か)を覚えておく
+const isFirstRun = localStorage.getItem(STORAGE_KEY) === null;
 
 let recipes = loadRecipes();
 let weekPlan = loadWeekPlan();
@@ -779,10 +786,9 @@ async function fetchYouTubeTitle(url) {
 }
 
 // レシピサイトはCORSで直接fetchできないことが多いため、公開プロキシ経由でHTMLを取得する。
-// 1つ目がダメでも2つ目を試す(それでもダメなサイトはあり得る)
+// (corsproxy.ioは有料APIキー必須になったため2026-09に利用をやめた)
 const CORS_PROXIES = [
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
 ];
 
 async function fetchHtmlViaProxies(url) {
@@ -827,9 +833,63 @@ function extractOgFallback(doc) {
   return { name: title, ingredients: "", steps: "" };
 }
 
+// クラシルやクックパッドなど大手サイトは、CORSプロキシ自体がサイト側にブロックされて
+// 失敗することがある。その場合はJina AI Readerという別方式(読みやすいテキストに変換して
+// 返してくれる無料サービス)で再挑戦する
+async function fetchMarkdownViaJinaReader(url) {
+  const res = await fetch(`https://r.jina.ai/${url}`);
+  if (!res.ok) throw new Error("jina reader request failed");
+  return await res.text();
+}
+
+// Jina Readerが返す文章から、画像・リンクなどの見た目情報を取り除いて文字だけにする
+function stripMarkdownNoise(text) {
+  return text
+    .replace(/!\[.*?\]\(.*?\)/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .split("\n")
+    .map((line) => line.replace(/^\s*[*\-]\s*/, "").trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
+// 「## 材料」「## 作り方」のような見出しから、次の見出しが出てくるまでの内容を取り出す
+function extractMarkdownSection(markdown, headingPattern) {
+  const lines = markdown.split("\n");
+  let capturing = false;
+  const captured = [];
+  for (const line of lines) {
+    if (/^#{1,3}\s/.test(line)) {
+      if (capturing) break;
+      capturing = headingPattern.test(line);
+      continue;
+    }
+    if (capturing) captured.push(line);
+  }
+  return captured.join("\n");
+}
+
+function parseRecipeMarkdown(markdown) {
+  const titleMatch = markdown.match(/^Title:\s*(.+)$/m);
+  const name = titleMatch ? titleMatch[1].trim() : "";
+  const ingredients = stripMarkdownNoise(extractMarkdownSection(markdown, /材料/));
+  const steps = stripMarkdownNoise(extractMarkdownSection(markdown, /(作り方|手順)/));
+
+  if (!name && !ingredients && !steps) return null;
+  return { name, ingredients, steps };
+}
+
 async function fetchRecipeSiteData(url) {
-  const html = await fetchHtmlViaProxies(url);
-  return parseRecipeHtml(html);
+  try {
+    const html = await fetchHtmlViaProxies(url);
+    const recipe = parseRecipeHtml(html);
+    if (recipe) return recipe;
+  } catch (e) {
+    // プロキシ経由が失敗しても、下のJina Reader方式で再挑戦する
+  }
+
+  const markdown = await fetchMarkdownViaJinaReader(url);
+  return parseRecipeMarkdown(markdown);
 }
 
 // schema.orgのRecipe構造はサイトによって配列/@graph/入れ子など形が異なるため再帰的に探す
@@ -898,7 +958,7 @@ fetchButton.addEventListener("click", async () => {
       fetchMessage.textContent = "レシピ情報を取得しました。内容を確認してください。";
     }
   } catch (e) {
-    fetchMessage.textContent = "自動取得できませんでした。お手数ですが手入力してください。";
+    fetchMessage.textContent = "自動取得できませんでした。下の「うまく読み取れない場合」からページのソースを貼り付けると取り込めることがあります。";
   }
 });
 
@@ -1142,6 +1202,43 @@ dismissInstallBannerButton.addEventListener("click", () => {
 
 setupInstallBanner();
 
+// --- アップデートのお知らせ ---
+// 新しい更新を知らせたい時は、ここのversionとitemsを書き換えるだけでOK。
+// versionを前回のデプロイから変えると、次に開いた人に自動で1回だけお知らせが表示される
+const LATEST_UPDATE = {
+  version: "2026-09-12",
+  title: "📢 アップデートのお知らせ",
+  items: [
+    "クラシルなど一部のレシピサイトで「読み取る」がうまく動かなかった問題を改善しました",
+    "買い物リストが「肉・魚」「野菜」などのカテゴリ別に自動で並ぶようになりました",
+  ],
+};
+const UPDATE_SEEN_KEY = "recipe_app_seen_update";
+
+function maybeShowUpdateNotice() {
+  if (isFirstRun) {
+    // 初めて使う人には「アップデート」を出さず、既読扱いにしておく
+    localStorage.setItem(UPDATE_SEEN_KEY, LATEST_UPDATE.version);
+    return;
+  }
+  if (localStorage.getItem(UPDATE_SEEN_KEY) === LATEST_UPDATE.version) return;
+
+  updateNoticeTitle.textContent = LATEST_UPDATE.title;
+  updateNoticeBody.innerHTML = "";
+  LATEST_UPDATE.items.forEach((text) => {
+    const p = document.createElement("p");
+    p.className = "update-notice-item";
+    p.textContent = `・${text}`;
+    updateNoticeBody.appendChild(p);
+  });
+  updateNoticeOverlay.classList.remove("hidden");
+  localStorage.setItem(UPDATE_SEEN_KEY, LATEST_UPDATE.version);
+}
+
+closeUpdateNoticeButton.addEventListener("click", () => {
+  updateNoticeOverlay.classList.add("hidden");
+});
+
 // --- PWA化: ホーム画面追加・オフライン閲覧に対応 ---
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -1151,3 +1248,4 @@ if ("serviceWorker" in navigator) {
 
 renderList();
 renderShoppingList();
+maybeShowUpdateNotice();
