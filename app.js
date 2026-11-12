@@ -81,9 +81,30 @@ function generateId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+// 保存データを読む。壊れていて読めないときは、壊れた中身を「〜_broken」に取っておいてから空で始める
+// (上書きで消さないため)。起動後にバックアップの読み込みへ案内する
+let brokenData = false;
+let brokenNotKept = false; // 壊れた中身を取っておけなかった
+function readSaved(key, empty) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return empty;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    brokenData = true;
+    try {
+      localStorage.setItem(key + "_broken", raw);
+    } catch {
+      // 容量いっぱいなどで取っておけなくても、起動は続ける（お知らせの文を変える）
+      brokenNotKept = true;
+    }
+    return empty;
+  }
+}
+
 function loadRecipes() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  return raw ? JSON.parse(raw) : [];
+  const list = readSaved(STORAGE_KEY, []);
+  return Array.isArray(list) ? list : [];
 }
 
 function saveRecipes() {
@@ -91,8 +112,7 @@ function saveRecipes() {
 }
 
 function loadWeekPlan() {
-  const raw = localStorage.getItem(WEEK_PLAN_KEY);
-  return raw ? JSON.parse(raw) : {};
+  return readSaved(WEEK_PLAN_KEY, {}) || {};
 }
 
 function saveWeekPlan() {
@@ -100,8 +120,8 @@ function saveWeekPlan() {
 }
 
 function loadShoppingList() {
-  const raw = localStorage.getItem(SHOPPING_LIST_KEY);
-  return raw ? JSON.parse(raw) : [];
+  const list = readSaved(SHOPPING_LIST_KEY, []);
+  return Array.isArray(list) ? list : [];
 }
 
 function saveShoppingList() {
@@ -958,7 +978,10 @@ fetchButton.addEventListener("click", async () => {
       fetchMessage.textContent = "レシピ情報を取得しました。内容を確認してください。";
     }
   } catch (e) {
-    fetchMessage.textContent = "自動取得できませんでした。下の「うまく読み取れない場合」からページのソースを貼り付けると取り込めることがあります。";
+    fetchMessage.textContent = "自動取得できませんでした。レシピのページの文章をコピーして、下の欄に貼り付けてください。";
+    // 貼り付け欄を開いて、すぐ貼れるようにする
+    pasteHtmlInput.closest("details").open = true;
+    pasteHtmlInput.focus();
   }
 });
 
@@ -969,9 +992,11 @@ parsePasteButton.addEventListener("click", () => {
     return;
   }
 
-  const recipe = parseRecipeHtml(html);
+  // ページのソース(HTML)ならそこから、ふつうの文章なら「材料」「作り方」の見出しで分けて読む
+  const looksLikeHtml = /<html|<head|<script|<meta/i.test(html);
+  const recipe = (looksLikeHtml && parseRecipeHtml(html)) || parseRecipeText(html);
   if (!recipe) {
-    fetchMessage.textContent = "貼り付けた内容からは読み取れませんでした。";
+    fetchMessage.textContent = "貼り付けた内容からは読み取れませんでした。「材料」「作り方」が入っているか確かめてください。";
     return;
   }
 
@@ -980,6 +1005,24 @@ parsePasteButton.addEventListener("click", () => {
   if (recipe.steps) stepsInput.value = recipe.steps;
   fetchMessage.textContent = "貼り付けた内容から取り込みました。内容を確認してください。";
 });
+
+// ページの文章をそのまま貼り付けたとき用。「材料」の行から下を材料、「作り方」「手順」の行から下を作り方とみなす
+// 料理名は「材料」より上の最初の行(長すぎる行は飛ばす)
+function parseRecipeText(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const isIngHead = (l) => /^[【\[■●◆]?\s*材料/.test(l) && l.length <= 20;
+  const isStepHead = (l) => /^[【\[■●◆]?\s*(作り方|手順|つくりかた)/.test(l) && l.length <= 20;
+  const ingAt = lines.findIndex(isIngHead);
+  const stepAt = lines.findIndex(isStepHead);
+  if (ingAt < 0 && stepAt < 0) return null;
+
+  const ingEnd = stepAt > ingAt ? stepAt : lines.length;
+  const ingredients = ingAt >= 0 ? lines.slice(ingAt + 1, ingEnd).join("\n") : "";
+  const steps = stepAt >= 0 ? lines.slice(stepAt + 1).join("\n") : "";
+  const top = Math.min(...[ingAt, stepAt].filter((n) => n >= 0));
+  const name = lines.slice(0, top).find((l) => l.length <= 40) || "";
+  return { name, ingredients, steps };
+}
 
 // --- 調理タイマー(レシピとは独立したシンプルなキッチンタイマー。同時に1つだけ) ---
 
@@ -1115,6 +1158,7 @@ exportDataButton.addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
   backupMessage.textContent = "書き出しました。";
+  localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
 });
 
 importDataInput.addEventListener("change", () => {
@@ -1146,9 +1190,16 @@ importDataInput.addEventListener("change", () => {
     recipes = data.recipes || [];
     weekPlan = data.weekPlan || {};
     shoppingList = data.shoppingList || [];
-    saveRecipes();
-    saveWeekPlan();
-    saveShoppingList();
+    try {
+      saveRecipes();
+      saveWeekPlan();
+      saveShoppingList();
+    } catch (e) {
+      // 端末の保存容量がいっぱい（写真が多いときなど）
+      backupMessage.textContent = "保存する容量がいっぱいで、読み込みきれませんでした。写真の多いレシピを減らすか、ブラウザの空きを作ってからもう一度お試しください。";
+      importDataInput.value = "";
+      return;
+    }
     renderList();
     renderShoppingList();
     backupMessage.textContent = "読み込みました。";
@@ -1215,24 +1266,65 @@ const LATEST_UPDATE = {
 };
 const UPDATE_SEEN_KEY = "recipe_app_seen_update";
 
+// お知らせの画面に、題名と文を出す(アップデート・バックアップのおすすめ・データが読めなかったとき で共用)
+function showNotice(title, items) {
+  updateNoticeTitle.textContent = title;
+  updateNoticeBody.innerHTML = "";
+  items.forEach((text) => {
+    const p = document.createElement("p");
+    p.className = "update-notice-item";
+    p.textContent = text;
+    updateNoticeBody.appendChild(p);
+  });
+  updateNoticeOverlay.classList.remove("hidden");
+}
+
+// 出したら true を返す(同じ日にお知らせを2つ重ねないため)
 function maybeShowUpdateNotice() {
   if (isFirstRun) {
     // 初めて使う人には「アップデート」を出さず、既読扱いにしておく
     localStorage.setItem(UPDATE_SEEN_KEY, LATEST_UPDATE.version);
-    return;
+    return false;
   }
-  if (localStorage.getItem(UPDATE_SEEN_KEY) === LATEST_UPDATE.version) return;
+  if (localStorage.getItem(UPDATE_SEEN_KEY) === LATEST_UPDATE.version) return false;
 
-  updateNoticeTitle.textContent = LATEST_UPDATE.title;
-  updateNoticeBody.innerHTML = "";
-  LATEST_UPDATE.items.forEach((text) => {
-    const p = document.createElement("p");
-    p.className = "update-notice-item";
-    p.textContent = `・${text}`;
-    updateNoticeBody.appendChild(p);
-  });
-  updateNoticeOverlay.classList.remove("hidden");
+  showNotice(LATEST_UPDATE.title, LATEST_UPDATE.items.map((text) => `・${text}`));
   localStorage.setItem(UPDATE_SEEN_KEY, LATEST_UPDATE.version);
+  return true;
+}
+
+// --- バックアップのおすすめ ---
+// レシピはこの端末の中だけにあるので、書き出しから30日たったら(一度もなければ)すすめる。断っても次は7日あける
+const LAST_EXPORT_KEY = "recipe_app_last_export";
+const BACKUP_NUDGE_KEY = "recipe_app_backup_nudged";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function maybeNudgeBackup() {
+  if (!recipes.length) return;
+  const daysSince = (key) => {
+    const at = localStorage.getItem(key);
+    return at ? (Date.now() - new Date(at).getTime()) / DAY_MS : Infinity;
+  };
+  if (daysSince(LAST_EXPORT_KEY) < 30 || daysSince(BACKUP_NUDGE_KEY) < 7) return;
+
+  const last = localStorage.getItem(LAST_EXPORT_KEY);
+  showNotice("💾 バックアップしませんか?", [
+    last ? `最後に書き出してから${Math.floor(daysSince(LAST_EXPORT_KEY))}日たちました。` : "まだ一度もバックアップを書き出していません。",
+    "レシピはこの端末の中だけに保存されているので、故障や機種変更で消えてしまいます。",
+    "下に開いた「データのバックアップ」の「書き出す」を押すと、ファイルに保存できます。",
+  ]);
+  backupPanel.classList.remove("hidden");
+  localStorage.setItem(BACKUP_NUDGE_KEY, new Date().toISOString());
+}
+
+// 保存データが壊れていて読めなかったとき
+function showBrokenDataNotice() {
+  showNotice("⚠ 保存データが読めませんでした", [
+    "この端末に保存されていたデータが壊れていて読めなかったので、空の状態で開きました。",
+    "書き出したバックアップファイルがあれば、「データのバックアップ」の「読み込む」から戻せます。",
+    brokenNotKept ? "(容量がいっぱいで、読めなかったデータは取っておけませんでした)" : "(読めなかったデータは、消さずに別に取ってあります)",
+  ]);
+  backupPanel.classList.remove("hidden");
 }
 
 closeUpdateNoticeButton.addEventListener("click", () => {
@@ -1248,4 +1340,5 @@ if ("serviceWorker" in navigator) {
 
 renderList();
 renderShoppingList();
-maybeShowUpdateNotice();
+if (brokenData) showBrokenDataNotice();
+else if (!maybeShowUpdateNotice()) maybeNudgeBackup();
