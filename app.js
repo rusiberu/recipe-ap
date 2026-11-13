@@ -128,12 +128,18 @@ function saveShoppingList() {
   localStorage.setItem(SHOPPING_LIST_KEY, JSON.stringify(shoppingList));
 }
 
+// 同じ材料・同じ出どころのものがもうあれば足さない(献立から2回押しても二重にならない)。足した数を返す
 function addShoppingItems(lines, source) {
+  let added = 0;
   lines.forEach((text) => {
+    const exists = shoppingList.some((item) => item.text === text && item.source === (source || null));
+    if (exists) return;
     shoppingList.push({ id: generateId(), text, checked: false, source: source || null });
+    added++;
   });
   saveShoppingList();
   renderShoppingList();
+  return added;
 }
 
 function buildShoppingItemRow(item) {
@@ -279,9 +285,13 @@ function extractIngredientTags(ingredientsText) {
 }
 
 // 買い物リストの項目テキストから、どのカテゴリ見出しの下に並べるかを判定する
+// 見出し分けだけに使う追加の言葉(「鶏もも肉」「豚バラ」なども肉に入れる。タグには使わない)
+const EXTRA_CATEGORY_WORDS = { "肉・魚": ["鶏", "豚", "合びき", "牛こま", "牛もも", "牛バラ", "牛ロース"] };
+
 function getItemCategory(text) {
   for (const [category, keywords] of Object.entries(INGREDIENT_CATEGORIES)) {
-    if (keywords.some((keyword) => text.includes(keyword))) return category;
+    const words = keywords.concat(EXTRA_CATEGORY_WORDS[category] || []);
+    if (words.some((keyword) => text.includes(keyword))) return category;
   }
   return "その他";
 }
@@ -774,8 +784,7 @@ buildShoppingListButton.addEventListener("click", () => {
     const lines = splitIngredientLines(recipe.ingredients);
     if (lines.length === 0) return;
 
-    addShoppingItems(lines, `${day}: ${recipe.name}`);
-    addedCount += lines.length;
+    addedCount += addShoppingItems(lines, `${day}: ${recipe.name}`);
   });
 
   if (addedCount === 0) {
@@ -1029,6 +1038,8 @@ function parseRecipeText(text) {
 let timerRemainingSeconds = 0;
 let timerIntervalId = null;
 let timerRunning = false;
+let timerEndAt = 0; // 終わる時刻。画面が消えて処理が止まっても、戻ったときに正しい残りを出せる
+let audioCtx = null; // 音の準備。iPhoneは押した操作の中で作らないと鳴らないことがあるので、開始ボタンで作る
 
 function formatTime(totalSeconds) {
   const m = Math.floor(totalSeconds / 60);
@@ -1041,7 +1052,7 @@ function updateTimerDisplay() {
 }
 
 function tickTimer() {
-  timerRemainingSeconds--;
+  timerRemainingSeconds = Math.ceil((timerEndAt - Date.now()) / 1000);
   updateTimerDisplay();
   if (timerRemainingSeconds <= 0) {
     stopTimerInterval();
@@ -1051,7 +1062,9 @@ function tickTimer() {
 
 function startTimerInterval() {
   clearInterval(timerIntervalId);
-  timerIntervalId = setInterval(tickTimer, 1000);
+  prepareAudio();
+  timerEndAt = Date.now() + timerRemainingSeconds * 1000;
+  timerIntervalId = setInterval(tickTimer, 250); // こまめに確かめる(残りは終わる時刻から計算するのでずれない)
   timerRunning = true;
   timerPauseResumeButton.disabled = false;
   timerPauseResumeButton.textContent = "一時停止";
@@ -1072,10 +1085,18 @@ function setAndStartTimer(minutes) {
 }
 
 // 音声ファイルなしで、その場で短いビープ音を鳴らす
-function playBeep() {
+// 開始・再開ボタンを押したときに呼ぶ(押した操作の中で音の準備をしておく)
+function prepareAudio() {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
-  const ctx = new AudioCtx();
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playBeep() {
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  if (ctx.state === "suspended") ctx.resume();
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
   oscillator.type = "sine";

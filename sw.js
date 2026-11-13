@@ -1,4 +1,4 @@
-const CACHE_NAME = "recipe-app-v3";
+const CACHE_NAME = "recipe-app-v4";
 const CACHE_FILES = [
   "./",
   "./index.html",
@@ -29,8 +29,12 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        // 保存するのは「自分のサイトのGETで、成功した返事」だけ(取り込みで使う他サイトの返事やエラーは残さない)
+        const own = new URL(event.request.url).origin === self.location.origin;
+        if (own && event.request.method === "GET" && response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
