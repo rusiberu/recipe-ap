@@ -1,4 +1,4 @@
-const CACHE_NAME = "recipe-app-v2";
+const CACHE_NAME = "recipe-app-v3";
 const CACHE_FILES = [
   "./",
   "./index.html",

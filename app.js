@@ -1156,9 +1156,16 @@ exportDataButton.addEventListener("click", () => {
   a.href = url;
   a.download = `recipe-app-backup-${dateStr}.json`;
   a.click();
-  URL.revokeObjectURL(url);
-  backupMessage.textContent = "書き出しました。";
-  localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+  // iPhoneでは保存の画面を閉じても「書き出した」ことになってしまうので、保存できたか聞いてから記録する
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    if (confirm("バックアップのファイルは保存できましたか？\n(できていなければ「キャンセル」)")) {
+      backupMessage.textContent = "書き出しました。";
+      localStorage.setItem(LAST_EXPORT_KEY, new Date().toISOString());
+    } else {
+      backupMessage.textContent = "保存できていなければ、もう一度「書き出す」を押してください。";
+    }
+  }, 1000);
 });
 
 importDataInput.addEventListener("change", () => {
