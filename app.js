@@ -107,8 +107,19 @@ function loadRecipes() {
   return Array.isArray(list) ? list : [];
 }
 
+// 端末に保存する。失敗したら(容量いっぱいなど)画面に出して false を返す。保存はすべてここを通る
+function trySave(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    alert("保存できませんでした。端末の保存容量がいっぱいかもしれません。写真の多いレシピを減らしてから、もう一度試してください。");
+    return false;
+  }
+}
+
 function saveRecipes() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(recipes));
+  return trySave(STORAGE_KEY, recipes);
 }
 
 function loadWeekPlan() {
@@ -116,7 +127,7 @@ function loadWeekPlan() {
 }
 
 function saveWeekPlan() {
-  localStorage.setItem(WEEK_PLAN_KEY, JSON.stringify(weekPlan));
+  return trySave(WEEK_PLAN_KEY, weekPlan);
 }
 
 function loadShoppingList() {
@@ -125,11 +136,14 @@ function loadShoppingList() {
 }
 
 function saveShoppingList() {
-  localStorage.setItem(SHOPPING_LIST_KEY, JSON.stringify(shoppingList));
+  return trySave(SHOPPING_LIST_KEY, shoppingList);
 }
 
 // 同じ材料・同じ出どころのものがもうあれば足さない(献立から2回押しても二重にならない)。足した数を返す
-function addShoppingItems(lines, source) {
+// save=false のときは保存しない(献立のように何回か足してから、呼ぶ側で1回だけ保存する)
+// 保存に失敗したら足した分を戻して -1 を返す
+function addShoppingItems(lines, source, save = true) {
+  const before = shoppingList.slice();
   let added = 0;
   lines.forEach((text) => {
     const exists = shoppingList.some((item) => item.text === text && item.source === (source || null));
@@ -137,7 +151,10 @@ function addShoppingItems(lines, source) {
     shoppingList.push({ id: generateId(), text, checked: false, source: source || null });
     added++;
   });
-  saveShoppingList();
+  if (save && added > 0 && !saveShoppingList()) {
+    shoppingList = before;
+    added = -1;
+  }
   renderShoppingList();
   return added;
 }
@@ -471,8 +488,10 @@ function buildCard(recipe) {
       copyMessageEl.textContent = "材料が登録されていません。";
       return;
     }
-    addShoppingItems(lines, recipe.name);
-    copyMessageEl.textContent = `${lines.length}件を買い物リストに追加しました。`;
+    const added = addShoppingItems(lines, recipe.name);
+    if (added === -1) copyMessageEl.textContent = "追加できませんでした。";
+    else if (added === 0) copyMessageEl.textContent = "すでに買い物リストに追加ずみです。";
+    else copyMessageEl.textContent = `${added}件を買い物リストに追加しました。`;
   });
 
   const sendButton = card.querySelector(".send-button");
@@ -611,6 +630,9 @@ form.addEventListener("submit", (e) => {
     checkedIngredients: [],
   };
 
+  // 保存に失敗したら元に戻すため、変える前の形を取っておく(戻さないと、もう一度押したとき二重に登録される)
+  const before = recipes.map((r) => ({ ...r }));
+
   if (editingIdInput.value) {
     const target = recipes.find((r) => r.id === editingIdInput.value);
     if (target) Object.assign(target, recipeData);
@@ -618,14 +640,10 @@ form.addEventListener("submit", (e) => {
     recipes.push({ id: generateId(), createdAt: Date.now(), cookCount: 0, ...recipeData });
   }
 
-  try {
-    saveRecipes();
-  } catch (err) {
-    if (err && err.name === "QuotaExceededError") {
-      alert("保存容量が一杯です。写真を減らすか、他のレシピの写真を削除してから、もう一度試してください。");
-      return;
-    }
-    throw err;
+  if (!saveRecipes()) {
+    recipes = before;
+    renderList(); // カードのボタンが戻したほうのレシピを指すように描き直す
+    return;
   }
 
   resetForm();
@@ -668,8 +686,7 @@ shoppingTabButton.addEventListener("click", showShoppingView);
 addShoppingItemButton.addEventListener("click", () => {
   const text = shoppingItemInput.value.trim();
   if (!text) return;
-  addShoppingItems([text], null);
-  shoppingItemInput.value = "";
+  if (addShoppingItems([text], null) >= 0) shoppingItemInput.value = ""; // 失敗したら打った文字は残す
 });
 
 shoppingItemInput.addEventListener("keydown", (e) => {
@@ -774,7 +791,9 @@ togglePlannerButton.addEventListener("click", () => {
 });
 
 buildShoppingListButton.addEventListener("click", () => {
+  const before = shoppingList.slice();
   let addedCount = 0;
+  let hasMenu = false; // 材料のある献立が1つでもあったか
 
   DAY_NAMES.forEach((day) => {
     const recipeId = weekPlan[day];
@@ -784,12 +803,23 @@ buildShoppingListButton.addEventListener("click", () => {
     const lines = splitIngredientLines(recipe.ingredients);
     if (lines.length === 0) return;
 
-    addedCount += addShoppingItems(lines, `${day}: ${recipe.name}`);
+    hasMenu = true;
+    addedCount += addShoppingItems(lines, `${day}: ${recipe.name}`, false);
   });
 
-  if (addedCount === 0) {
+  // 保存は全部足してから1回だけ(失敗のお知らせが何回も出ないように)
+  if (addedCount > 0 && !saveShoppingList()) {
+    shoppingList = before;
+    renderShoppingList();
+    return;
+  }
+
+  if (!hasMenu) {
     alert("献立が選択されていません。曜日ごとにレシピを選んでください。");
     return;
+  }
+  if (addedCount === 0) {
+    alert("献立の材料は、すでに買い物リストに追加ずみです。");
   }
 
   showShoppingView();
@@ -1215,15 +1245,18 @@ importDataInput.addEventListener("change", () => {
       return;
     }
 
+    const old = { recipes, weekPlan, shoppingList }; // 失敗したら元に戻すため
     recipes = data.recipes || [];
     weekPlan = data.weekPlan || {};
     shoppingList = data.shoppingList || [];
-    try {
+    if (!(saveRecipes() && saveWeekPlan() && saveShoppingList())) {
+      // 端末の保存容量がいっぱい（写真が多いときなど）→ 前のデータに戻して保存し直す(新旧が混ざらないように)
+      recipes = old.recipes;
+      weekPlan = old.weekPlan;
+      shoppingList = old.shoppingList;
       saveRecipes();
       saveWeekPlan();
       saveShoppingList();
-    } catch (e) {
-      // 端末の保存容量がいっぱい（写真が多いときなど）
       backupMessage.textContent = "保存する容量がいっぱいで、読み込みきれませんでした。写真の多いレシピを減らすか、ブラウザの空きを作ってからもう一度お試しください。";
       importDataInput.value = "";
       return;
