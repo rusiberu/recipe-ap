@@ -635,7 +635,13 @@ form.addEventListener("submit", (e) => {
 
   if (editingIdInput.value) {
     const target = recipes.find((r) => r.id === editingIdInput.value);
-    if (target) Object.assign(target, recipeData);
+    if (target) {
+      // 材料の文が変わっていなければ、買い物のチェックは残す(メモだけ直したときなど)
+      if (target.ingredients === recipeData.ingredients) {
+        recipeData.checkedIngredients = target.checkedIngredients || [];
+      }
+      Object.assign(target, recipeData);
+    }
   } else {
     recipes.push({ id: generateId(), createdAt: Date.now(), cookCount: 0, ...recipeData });
   }
@@ -939,16 +945,28 @@ function parseRecipeMarkdown(markdown) {
 }
 
 async function fetchRecipeSiteData(url) {
+  let titleOnly = null;
   try {
     const html = await fetchHtmlViaProxies(url);
     const recipe = parseRecipeHtml(html);
-    if (recipe) return recipe;
+    if (recipe && (recipe.ingredients || recipe.steps)) return recipe;
+    titleOnly = recipe; // 料理名だけ取れた → 材料・作り方を求めてJinaも試す
   } catch (e) {
     // プロキシ経由が失敗しても、下のJina Reader方式で再挑戦する
   }
 
-  const markdown = await fetchMarkdownViaJinaReader(url);
-  return parseRecipeMarkdown(markdown);
+  try {
+    const markdown = await fetchMarkdownViaJinaReader(url);
+    const recipe = parseRecipeMarkdown(markdown);
+    if (recipe && (recipe.ingredients || recipe.steps)) {
+      return { ...recipe, name: recipe.name || (titleOnly && titleOnly.name) || "" };
+    }
+    if (titleOnly) return titleOnly;
+    return recipe;
+  } catch (e) {
+    if (titleOnly) return titleOnly; // Jinaもだめなら、料理名だけの結果を使う
+    throw e;
+  }
 }
 
 // schema.orgのRecipe構造はサイトによって配列/@graph/入れ子など形が異なるため再帰的に探す
@@ -1234,11 +1252,29 @@ importDataInput.addEventListener("change", () => {
       return;
     }
 
-    if (!Array.isArray(data.recipes)) {
+    if (!data || !Array.isArray(data.recipes)) {
       backupMessage.textContent = "バックアップファイルの形式が正しくありません。";
       importDataInput.value = "";
       return;
     }
+    // 中の1件がこわれていても一覧が真っ白にならないよう、使えない項目は捨てて形をそろえる
+    const cleanRecipes = data.recipes
+      .filter((r) => r && typeof r === "object" && typeof r.name === "string")
+      .map((r) => ({
+        ...r,
+        id: r.id || generateId(),
+        status: r.status === "made" ? "made" : "interested", // 変な値だと編集でエラーになる
+        ingredients: String(r.ingredients ?? ""),
+        steps: String(r.steps ?? ""),
+      }));
+    const cleanShopping = Array.isArray(data.shoppingList)
+      ? data.shoppingList
+        .filter((i) => i && typeof i === "object" && typeof i.text === "string")
+        .map((i) => ({ ...i, id: i.id || generateId() })) // 削除は id で見分けるので必ず付ける
+      : [];
+    const cleanWeekPlan = data.weekPlan && typeof data.weekPlan === "object" && !Array.isArray(data.weekPlan)
+      ? data.weekPlan
+      : {};
 
     if (!confirm("今のデータを上書きして読み込みますか?この操作は元に戻せません。")) {
       importDataInput.value = "";
@@ -1246,9 +1282,9 @@ importDataInput.addEventListener("change", () => {
     }
 
     const old = { recipes, weekPlan, shoppingList }; // 失敗したら元に戻すため
-    recipes = data.recipes || [];
-    weekPlan = data.weekPlan || {};
-    shoppingList = data.shoppingList || [];
+    recipes = cleanRecipes;
+    weekPlan = cleanWeekPlan;
+    shoppingList = cleanShopping;
     if (!(saveRecipes() && saveWeekPlan() && saveShoppingList())) {
       // 端末の保存容量がいっぱい（写真が多いときなど）→ 前のデータに戻して保存し直す(新旧が混ざらないように)
       recipes = old.recipes;
